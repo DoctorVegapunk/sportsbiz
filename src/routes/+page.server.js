@@ -1,14 +1,16 @@
 import { db } from '$lib/firebase.js';
-import { get, ref } from "firebase/database";
+import { get, ref, set } from "firebase/database";
 
 export const load = async ({ fetch }) => {
+  const leaguesRef = ref(db, 'leagues');
+  const snapshot = await get(leaguesRef);
 
-
-  const snapshot = await get(ref(db, 'leagues'));
+  // Only fetch from API if "leagues" does not exist in the database
   if (snapshot.exists()) {
     return snapshot.val();
   }
 
+  // If "leagues" is missing, fetch from API and save to Firebase
   try {
     const API_KEY = import.meta.env.VITE_FOOTBALL_DATA_API_KEY;
 
@@ -21,11 +23,9 @@ export const load = async ({ fetch }) => {
         }
       }
     );
-    
     if (!competitionsResponse.ok) {
       throw new Error(`Failed to fetch competitions: ${competitionsResponse.status}`);
     }
-    
     const competitionsData = await competitionsResponse.json();
 
     // Filter for soccer/football competitions
@@ -35,9 +35,7 @@ export const load = async ({ fetch }) => {
 
     // Fetch matches for all football leagues
     const allMatches = [];
-    
     for (const competition of footballCompetitions) {
-      // Get upcoming matches for this competition
       const response = await fetch(
         `https://api.football-data.org/v4/competitions/${competition.code}/matches?status=SCHEDULED`,
         {
@@ -46,11 +44,8 @@ export const load = async ({ fetch }) => {
           }
         }
       );
-      
       if (response.ok) {
         const matchesData = await response.json();
-        
-        // Add matches with modified structure
         allMatches.push(...matchesData.matches.map(m => ({
           id: m.id.toString(),
           sportKey: competition.code,
@@ -73,10 +68,14 @@ export const load = async ({ fetch }) => {
       return acc;
     }, {});
 
-    return {
+    const leaguesData = {
       leagues: Object.entries(matchesByLeague),
-      error: null
+      updatedAt: Date.now()
     };
+
+    await set(leaguesRef, leaguesData);
+
+    return leaguesData;
   } catch (error) {
     console.error('API error:', error);
     return {
