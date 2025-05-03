@@ -1,35 +1,16 @@
 <script>
-  import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  
+
   const { data } = $props();
-  
+
   let searchQuery = $state('');
   let expandedLeagues = $state(new Set());
-  let pageKey = $state(Date.now()); // Force re-render on navigation
-  
-  // Monitor URL for debugging
-  let currentUrl = $state('');
-  
+  let pageKey = $state(Date.now());
+
   onMount(() => {
-    console.log('Home page mounted', $page.url.pathname);
-    
-    // Reset state on mount
     expandedLeagues = new Set();
-    
-    // Register for browser back button events
-    window.addEventListener('popstate', () => {
-      console.log('Browser back button used');
-      pageKey = Date.now(); // Force re-render
-    });
   });
-  
-  $effect(() => {
-    currentUrl = $page.url.pathname + $page.url.search;
-    console.log('Home page URL updated:', currentUrl);
-  });
-  
+
   // Filter leagues based on search query
   const filteredLeagues = $derived(
     (data.leagues || []).filter(([leagueName, matches]) => {
@@ -39,7 +20,6 @@
         match.home_team?.toLowerCase().includes(searchTerm) ||
         match.away_team?.toLowerCase().includes(searchTerm)
       );
-      
       return leagueMatches || teamsMatch;
     })
   );
@@ -61,38 +41,11 @@
       month: 'short'
     });
   };
-  
-  const toggleAllLeagues = async () => {
-    try {
-      // Force hard navigation by reloading the page with the new parameter
-      // This is more reliable than client-side navigation for state changes
-      window.location.href = `/?showAll=${!data.showAllLeagues}`;
-    } catch (error) {
-      console.error('Navigation error:', error);
-    }
-  };
-  
-  const navigateToMatch = (sportKey, matchId) => {
-    // Use a full page reload for more reliable navigation
-    window.location.href = `/matches/${sportKey}/${matchId}`;
-    return false; // Prevent default
-  };
 </script>
 
-<div class="max-w-7xl mx-auto p-4" id="leagues-page" key={pageKey}>
-  <!-- Current URL for debugging -->
-  <div class="mb-2 bg-gray-50 p-2 text-xs text-gray-500 rounded">
-    Current URL: {currentUrl}
-  </div>
 
-  <!-- API Usage Counter -->
-  {#if data.remaining_requests !== undefined}
-    <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 flex justify-between items-center">
-      <span class="font-medium">API Requests Remaining: {data.remaining_requests}</span>
-      <span class="text-sm text-gray-600">Daily limit: {data.daily_limit || 500}</span>
-    </div>
-  {/if}
 
+<div class="max-w-7xl mx-auto p-4 min-h-[70vh]" id="leagues-page" key={pageKey}>
   <!-- Search Bar -->
   <div class="mb-6">
     <input
@@ -110,32 +63,28 @@
     </div>
   {/if}
 
-  <!-- Toggle All Leagues Button -->
-  <div class="mb-4">
-    <button 
-      on:click={toggleAllLeagues}
-      class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-    >
-      {data.showAllLeagues ? 'Show Major Leagues Only' : 'Show All Leagues'}
-    </button>
-    <span class="ml-3 text-gray-600">
-      {data.showAllLeagues ? 'Showing all leagues' : 'Showing major leagues only'}
-    </span>
-  </div>
-
   <!-- Leagues List -->
   {#if filteredLeagues.length > 0}
     <div class="space-y-4">
       {#each filteredLeagues as [leagueName, matches]}
-        <div class="border rounded-lg overflow-hidden">
-          <!-- League Header -->
+        <div class="border rounded-lg overflow-hidden shadow-sm bg-white">
+          <!-- League Header with Emblem -->
           <button
             on:click={() => toggleLeague(leagueName)}
             class="w-full p-4 bg-gray-50 hover:bg-gray-100 flex justify-between items-center"
           >
-            <h2 class="text-xl font-semibold">
-              {leagueName.replace(/_/g, ' ').toUpperCase()}
-            </h2>
+            <div class="flex items-center">
+              {#if matches[0]?.sport_emblem}
+                <img 
+                  src={matches[0].sport_emblem} 
+                  alt={leagueName}
+                  class="h-8 w-8 mr-3"
+                />
+              {/if}
+              <h2 class="text-xl font-semibold">
+                {leagueName}
+              </h2>
+            </div>
             <span class="text-gray-600">
               {expandedLeagues.has(leagueName) ? '▼' : '▶'}
             </span>
@@ -145,21 +94,22 @@
           {#if expandedLeagues.has(leagueName)}
             <div class="divide-y">
               {#each matches as match (match.id)}
-                <!-- Use standard <a> with data-sveltekit-reload for more reliable navigation -->
                 <a 
                   href="/matches/{match.sportKey}/{match.id}" 
                   data-sveltekit-reload
-                  class="block p-4 hover:bg-gray-50 transition-colors"
+                  class="block p-4 match-hover transition-all duration-200"
                 >
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between match-content transition-all duration-200">
                     <!-- Home Team -->
-                    <div class="flex-1 text-right">
-                      <span class="font-medium">{match.home_team}</span>
-                      <img 
-                        src={match.home_team_logo || '/placeholder-team.png'} 
-                        class="h-8 w-8 mx-2 inline-block"
-                        alt={match.home_team}
-                      />
+                    <div class="flex-1 text-right team-info transition-all duration-200">
+                      <span class="font-medium team-name">{match.home_team}</span>
+                      {#if match.home_team_logo}
+                        <img 
+                          src={match.home_team_logo} 
+                          class="h-8 w-8 mx-2 inline-block team-logo"
+                          alt={match.home_team}
+                        />
+                      {/if}
                     </div>
 
                     <!-- Match Info -->
@@ -169,18 +119,20 @@
                       </div>
                       <div class="text-xl font-bold my-1">VS</div>
                       <div class="text-sm text-gray-500">
-                        {match.sport_title.replace(/_/g, ' ')}
+                        {match.sport_title}
                       </div>
                     </div>
 
                     <!-- Away Team -->
-                    <div class="flex-1 text-left">
-                      <img 
-                        src={match.away_team_logo || '/placeholder-team.png'} 
-                        class="h-8 w-8 mx-2 inline-block"
-                        alt={match.away_team}
-                      />
-                      <span class="font-medium">{match.away_team}</span>
+                    <div class="flex-1 text-left team-info transition-all duration-200">
+                      {#if match.away_team_logo}
+                        <img 
+                          src={match.away_team_logo} 
+                          class="h-8 w-8 mx-2 inline-block team-logo"
+                          alt={match.away_team}
+                        />
+                      {/if}
+                      <span class="font-medium team-name">{match.away_team}</span>
                     </div>
                   </div>
                 </a>
@@ -197,9 +149,37 @@
   {/if}
 </div>
 
+
+
 <style>
-  /* Add hover transition */
-  .block:hover {
-    transition: background-color 0.2s ease-in-out;
+  /* Banner shadow and logo drop-shadow handled inline */
+
+  /* Match hover effect */
+  .match-hover {
+    background-color: #fff;
+    cursor: pointer;
+  }
+  .match-hover:hover {
+    background-color: #e6f0ff;
+    box-shadow: 0 4px 16px 0 rgba(30, 64, 175, 0.08);
+  }
+  .match-hover:hover .match-content {
+    transform: scale(1.035);
+  }
+  .match-hover:hover .team-logo,
+  .match-hover:hover .team-name {
+    transform: scale(1.12);
+    color: #2563eb;
+    filter: drop-shadow(0 2px 6px #2563eb22);
+  }
+  .team-logo,
+  .team-name {
+    transition: transform 0.18s cubic-bezier(.4,0,.2,1), color 0.18s;
+  }
+
+  /* Footer quirks */
+  footer {
+    border-top: 2px solid #2563eb22;
+    letter-spacing: 0.01em;
   }
 </style>

@@ -1,217 +1,298 @@
 <script>
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  export let data;
   
-  const { data } = $props();
-  
-  // Corrected derived state declaration
-  let match = $derived(data.match || {
-    home_team: "Data Unavailable",
-    away_team: "Data Unavailable",
-    commence_time: new Date().toISOString(),
-    sport_title: "Loading error",
-    bookmakers: []
-  });
-  
-  // Format odds display helper
-  const formatOdd = (price) => {
-    if (typeof price !== 'number') return '-';
-    return price.toFixed(2);
+  // Format date for display
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
   
-  // Navigation handling - use replacement state to avoid history issues
-  function goToHome() {
-    goto('/', { 
-      replaceState: false,
-      noScroll: false,
-      keepFocus: false,
-      invalidateAll: true
-    });
-  }
+  // Calculate win percentages for predictions
+  const getWinPercentage = () => {
+    if (!data.predictions || !data.predictions.predictions) return { home: 33, away: 33, draw: 34 };
+    const predictions = data.predictions.predictions;
+    return {
+      home: parseInt(predictions.percent.home || "33"),
+      away: parseInt(predictions.percent.away || "33"),
+      draw: parseInt(predictions.percent.draw || "34")
+    };
+  };
   
-  // Add URL monitoring to debug navigation
-  let currentUrl = $state('');
+  const winPercentages = getWinPercentage();
   
-  $effect(() => {
-    currentUrl = $page.url.pathname;
-    console.log('Match page URL updated:', currentUrl);
-  });
+  // Check if match is live
+  const isLiveMatch = data.match?.status === 'IN_PLAY';
 </script>
 
-<div class="max-w-7xl mx-auto p-4 space-y-6">
-  <!-- Back button - using <a> for native navigation -->
-  <div class="flex items-center justify-between mb-4">
-    <a 
-      href="/"
-      class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded inline-flex items-center"
-      data-sveltekit-reload
-    >
-      <span class="mr-1">←</span> Back to Leagues (Link)
-    </a>
-    
-    <button 
-      on:click={goToHome}
-      class="bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold py-2 px-4 rounded inline-flex items-center"
-    >
-      <span class="mr-1">←</span> Back to Leagues (Button)
-    </button>
-  </div>
-
-  <!-- Match Header -->
-  <div class="bg-white p-6 rounded-lg shadow-md">
-    <div class="flex items-center justify-between">
-      <div class="text-center flex-1">
-        <h2 class="text-2xl font-bold">{match.home_team}</h2>
-        <p class="text-gray-600">Home</p>
-      </div>
-      
-      <div class="text-center mx-4">
-        <div class="text-gray-600">
-          {new Date(match.commence_time).toLocaleDateString('en-KE', {
-            weekday: 'short', 
-            day: 'numeric',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
+<div class="container mx-auto px-4 py-8 animate-fadein">
+  {#if !data.matchFound}
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-8 animate-shake">
+      <p>Match not found or error occurred.</p>
+      {#if data.error}
+      <p class="text-sm mt-2">Error: {data.error}</p>
+      {#if data.error.includes('rate limit')}
+        <p class="text-xs mt-2 text-orange-600">You have made too many requests. Please wait a minute before trying again.</p>
+      {/if}
+    {/if}
+    </div>
+  {:else}
+    <!-- Match Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-2xl md:text-3xl font-bold text-blue-700 mb-4 drop-shadow-lg animate-slidein">{data.match.competition.name}</h1>
+      <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-6 my-8">
+        <div class="flex flex-col items-center space-y-2 group transition-all duration-200">
+          <img src={data.match.homeTeam.crest} alt={data.match.homeTeam.name} class="w-20 h-20 object-contain team-logo transition-transform duration-200 group-hover:scale-110 drop-shadow-md" />
+          <h2 class="text-xl font-semibold text-gray-800 team-name transition-colors duration-200 group-hover:text-blue-700">{data.match.homeTeam.name}</h2>
+          {#if data.homeTeamStanding}
+            <span class="text-sm bg-blue-50 px-2 py-1 rounded font-bold text-blue-700 shadow">{'#'}{data.homeTeamStanding.position}</span>
+          {/if}
         </div>
-        <div class="text-4xl my-2">VS</div>
-        <div class="text-sm bg-blue-100 px-2 py-1 rounded">
-          {match.sport_title?.replace(/_/g, ' ')}
+        <div class="text-3xl font-bold text-gray-500 my-4 md:my-0 flex flex-col items-center justify-center">
+          {#if data.match.status === 'FINISHED'}
+            <div class="text-2xl font-bold animate-pop">
+              {data.match.score.fullTime.home ?? '-'} : {data.match.score.fullTime.away ?? '-'}
+            </div>
+          {:else}
+            <span class="animate-pulse">VS</span>
+          {/if}
+          <div class="text-sm mt-2 text-gray-600">
+            Matchday {data.match.matchday}
+          </div>
+        </div>
+        <div class="flex flex-col items-center space-y-2 group transition-all duration-200">
+          <img src={data.match.awayTeam.crest} alt={data.match.awayTeam.name} class="w-20 h-20 object-contain team-logo transition-transform duration-200 group-hover:scale-110 drop-shadow-md" />
+          <h2 class="text-xl font-semibold text-gray-800 team-name transition-colors duration-200 group-hover:text-red-700">{data.match.awayTeam.name}</h2>
+          {#if data.awayTeamStanding}
+            <span class="text-sm bg-red-50 px-2 py-1 rounded font-bold text-red-700 shadow">{'#'}{data.awayTeamStanding.position}</span>
+          {/if}
         </div>
       </div>
-
-      <div class="text-center flex-1">
-        <h2 class="text-2xl font-bold">{match.away_team}</h2>
-        <p class="text-gray-600">Away</p>
+      <div class="text-gray-600 space-y-2">
+        <p class="animate-fadein">{formatDate(data.match.utcDate)}</p>
+        {#if data.venue}
+          <p>Venue: <span class="font-semibold">{data.venue.name}</span>, {data.venue.city}</p>
+        {/if}
+        {#if isLiveMatch}
+          <div class="inline-block px-3 py-1 bg-red-600 text-white rounded-full text-sm font-bold animate-pulse">
+            LIVE
+          </div>
+        {:else if data.match.status === 'FINISHED'}
+          <div class="inline-block px-3 py-1 bg-gray-600 text-white rounded-full text-sm font-bold">
+            COMPLETED
+          </div>
+        {:else}
+          <div class="inline-block px-3 py-1 bg-green-600 text-white rounded-full text-sm font-bold">
+            {data.match.status == "TIMED" ? "SCHEDULED" : data.match.status}
+          </div>
+        {/if}
       </div>
     </div>
-  </div>
-
-  <!-- Current URL for debugging -->
-  <div class="bg-gray-50 p-2 text-xs text-gray-500 rounded">
-    Current URL: {currentUrl}
-  </div>
-
-  <!-- Kenyan Bookmakers Odds -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {#if match.bookmakers && match.bookmakers.length > 0}
-      {#each match.bookmakers as bookmaker}
-        <div class="bg-white p-4 rounded-lg shadow-md">
-          <h3 class="text-xl font-bold mb-3">{bookmaker.title}</h3>
-          
-          <!-- Match Winner -->
-          {#if bookmaker.markets?.find(m => m.key === 'h2h')}
-            <div class="mb-4">
-              <h4 class="font-semibold mb-2">Match Winner</h4>
-              <div class="grid grid-cols-3 gap-2">
-                {#each bookmaker.markets.find(m => m.key === 'h2h').outcomes as outcome}
-                  <div class="bg-gray-50 p-2 rounded text-center">
-                    <span class="block text-sm">{outcome.name}</span>
-                    <span class="font-bold text-green-600">{formatOdd(outcome.price)}</span>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {/if}
-
-          <!-- Handicap -->
-          {#if bookmaker.markets?.find(m => m.key === 'spreads')}
-            <div class="mb-4">
-              <h4 class="font-semibold mb-2">Handicap</h4>
-              <div class="grid grid-cols-2 gap-2">
-                {#each bookmaker.markets.find(m => m.key === 'spreads').outcomes as outcome}
-                  <div class="bg-gray-50 p-2 rounded text-center">
-                    <span class="block text-sm">{outcome.name}</span>
-                    <span class="font-bold text-blue-600">{formatOdd(outcome.price)}</span>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {/if}
-
-          <!-- Over/Under -->
-          {#if bookmaker.markets?.find(m => m.key === 'totals')}
-            <div class="mb-4">
-              <h4 class="font-semibold mb-2">Over/Under</h4>
-              <div class="grid grid-cols-2 gap-2">
-                {#each bookmaker.markets.find(m => m.key === 'totals').outcomes as outcome}
-                  <div class="bg-gray-50 p-2 rounded text-center">
-                    <span class="block text-sm">{outcome.name}</span>
-                    <span class="font-bold text-purple-600">{formatOdd(outcome.price)}</span>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/each}
-    {:else}
-      <div class="col-span-2 bg-gray-50 p-4 rounded text-center">
-        <div class="animate-pulse">
-          Loading odds data... If this persists, odds may not be available for this match.
-        </div>
-      </div>
-    {/if}
-  </div>
-
-  <!-- Additional Match Data -->
-  <div class="bg-white p-6 rounded-lg shadow-md">
-    <h3 class="text-xl font-bold mb-4">Match Details</h3>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Venue Info -->
-      <div>
-        <h4 class="font-semibold mb-2">Venue</h4>
-        <p>{match.venue || 'N/A'}</p>
-        <p class="text-sm text-gray-600">{match.location || 'Location not available'}</p>
+    <!-- Match Analysis Section -->
+    <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow-md overflow-hidden mb-8 animate-fadein-slow">
+      <div class="bg-blue-700 p-3 text-white">
+        <h2 class="text-lg font-bold">Match Analysis</h2>
       </div>
-
-      <!-- Team Form -->
-      <div>
-        <h4 class="font-semibold mb-2">Recent Form</h4>
-        <div class="flex justify-between">
-          <div>
-            <p class="text-sm">Home: {match.stats?.home_form?.join(' ') || 'N/A'}</p>
-          </div>
-          <div>
-            <p class="text-sm">Away: {match.stats?.away_form?.join(' ') || 'N/A'}</p>
-          </div>
+      <div class="p-4">
+        <p class="text-gray-700">
+          This highly anticipated match brings together two teams with contrasting styles. 
+          Based on current form and historical performance, we can expect an engaging contest 
+          with key battles across the pitch. The outcome may well depend on which team manages 
+          to control the midfield and capitalize on scoring opportunities. <span class="text-red-400 font-bold">JUST A PLACEHOLDER</span>
+        </p>
+      </div>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+      <!-- Team Standings -->
+      <div class="bg-white rounded-lg shadow-md overflow-hidden animate-fadein-slow">
+        <div class="bg-blue-700 p-3 text-white">
+          <h2 class="text-lg font-bold">Team Standings</h2>
         </div>
-      </div>
-
-      <!-- Head-to-Head -->
-      {#if match.stats?.h2h?.length > 0}
-        <div class="md:col-span-2">
-          <h4 class="font-semibold mb-2">Last Meetings</h4>
+        <div class="p-4">
           <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-2 text-left">Date</th>
-                  <th class="px-4 py-2">Home</th>
-                  <th class="px-4 py-2">Score</th>
-                  <th class="px-4 py-2">Away</th>
+            <table class="min-w-full">
+              <thead>
+                <tr class="bg-blue-50">
+                  <th class="px-4 py-2 text-left">Team</th>
+                  <th class="px-4 py-2 text-center">Pos</th>
+                  <th class="px-4 py-2 text-center">P</th>
+                  <th class="px-4 py-2 text-center">W</th>
+                  <th class="px-4 py-2 text-center">D</th>
+                  <th class="px-4 py-2 text-center">L</th>
+                  <th class="px-4 py-2 text-center">GD</th>
+                  <th class="px-4 py-2 text-center">Pts</th>
                 </tr>
               </thead>
               <tbody>
-                {#each match.stats.h2h.slice(0, 5) as h2hMatch}
-                  <tr class="border-t">
-                    <td class="px-4 py-2">{new Date(h2hMatch.commence_time).toLocaleDateString('en-KE')}</td>
-                    <td class="px-4 py-2 text-center">{h2hMatch.home_team}</td>
-                    <td class="px-4 py-2 text-center font-bold">
-                      {h2hMatch.scores?.find(s => s.name === 'Home')?.score || '-'} - 
-                      {h2hMatch.scores?.find(s => s.name === 'Away')?.score || '-'}
+                {#if data.homeTeamStanding}
+                  <tr class="bg-blue-50 hover:bg-blue-100 transition-all duration-200">
+                    <td class="px-4 py-2 flex items-center">
+                      <img src={data.homeTeamStanding.team.crest} alt="" class="w-5 h-5 mr-2" />
+                      <span>{data.homeTeamStanding.team.shortName || data.homeTeamStanding.team.name}</span>
                     </td>
-                    <td class="px-4 py-2 text-center">{h2hMatch.away_team}</td>
+                    <td class="px-4 py-2 text-center">{data.homeTeamStanding.position}</td>
+                    <td class="px-4 py-2 text-center">{data.homeTeamStanding.playedGames}</td>
+                    <td class="px-4 py-2 text-center">{data.homeTeamStanding.won}</td>
+                    <td class="px-4 py-2 text-center">{data.homeTeamStanding.draw}</td>
+                    <td class="px-4 py-2 text-center">{data.homeTeamStanding.lost}</td>
+                    <td class="px-4 py-2 text-center">{data.homeTeamStanding.goalDifference}</td>
+                    <td class="px-4 py-2 text-center font-bold">{data.homeTeamStanding.points}</td>
+                  </tr>
+                {/if}
+                {#if data.awayTeamStanding}
+                  <tr class="bg-red-50 hover:bg-red-100 transition-all duration-200">
+                    <td class="px-4 py-2 flex items-center">
+                      <img src={data.awayTeamStanding.team.crest} alt="" class="w-5 h-5 mr-2" />
+                      <span>{data.awayTeamStanding.team.shortName || data.awayTeamStanding.team.name}</span>
+                    </td>
+                    <td class="px-4 py-2 text-center">{data.awayTeamStanding.position}</td>
+                    <td class="px-4 py-2 text-center">{data.awayTeamStanding.playedGames}</td>
+                    <td class="px-4 py-2 text-center">{data.awayTeamStanding.won}</td>
+                    <td class="px-4 py-2 text-center">{data.awayTeamStanding.draw}</td>
+                    <td class="px-4 py-2 text-center">{data.awayTeamStanding.lost}</td>
+                    <td class="px-4 py-2 text-center">{data.awayTeamStanding.goalDifference}</td>
+                    <td class="px-4 py-2 text-center font-bold">{data.awayTeamStanding.points}</td>
+                  </tr>
+                {/if}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Match Predictions (Simplified) -->
+      <div class="bg-white rounded-lg shadow-md overflow-hidden animate-fadein-slow">
+        <div class="bg-blue-700 p-3 text-white">
+          <h2 class="text-lg font-bold">Match Predictions</h2>
+        </div>
+        <div class="p-4">
+          {#if data.predictions && data.predictions.predictions}
+            <div class="mb-4">
+              <h3 class="font-bold mb-2">Win Probability</h3>
+              <div class="flex mb-2 h-8 rounded-full overflow-hidden shadow-inner">
+                <div class="bg-blue-500 text-white text-xs font-medium flex items-center justify-center transition-all duration-300" style="width: {winPercentages.home}%">
+                  {winPercentages.home}%
+                </div>
+                <div class="bg-gray-500 text-white text-xs font-medium flex items-center justify-center transition-all duration-300" style="width: {winPercentages.draw}%">
+                  {winPercentages.draw}%
+                </div>
+                <div class="bg-red-500 text-white text-xs font-medium flex items-center justify-center transition-all duration-300" style="width: {winPercentages.away}%">
+                  {winPercentages.away}%
+                </div>
+              </div>
+              <div class="flex text-xs justify-between px-2">
+                <span>Home</span>
+                <span>Draw</span>
+                <span>Away</span>
+              </div>
+            </div>
+            
+            {#if data.predictions.predictions.advice}
+              <div class="mt-4">
+                <h3 class="font-bold mb-2">Expert Advice</h3>
+                <p class="text-sm bg-blue-50 p-3 rounded shadow">{data.predictions.predictions.advice}</p>
+              </div>
+            {/if}
+          {:else}
+            <div class="text-center py-4 text-gray-500 animate-fadein">
+              <p>No prediction data available for this match</p>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Head to Head (Without Summary) -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8 animate-fadein-slow">
+      <div class="bg-blue-700 p-3 text-white">
+        <h2 class="text-lg font-bold">Head to Head</h2>
+      </div>
+      <div class="p-4">
+        {#if data.headToHeadData?.matches && data.headToHeadData.matches.length > 0}
+          <div class="overflow-x-auto">
+            <table class="min-w-full">
+              <thead>
+                <tr class="bg-blue-50">
+                  <th class="px-4 py-2 text-left">Date</th>
+                  <th class="px-4 py-2 text-left">Competition</th>
+                  <th class="px-4 py-2 text-right">Home</th>
+                  <th class="px-4 py-2 text-center">Score</th>
+                  <th class="px-4 py-2 text-left">Away</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each data.headToHeadData.matches as match}
+                  <tr class="border-b hover:bg-blue-50 transition-all duration-200">
+                    <td class="px-4 py-2 text-sm">{new Date(match.utcDate).toLocaleDateString()}</td>
+                    <td class="px-4 py-2">
+                      <div class="flex items-center">
+                        <img src={match.competition.emblem} alt="" class="w-5 h-5 mr-2" />
+                        <span class="text-sm">{match.competition.name}</span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-2 text-right">{match.homeTeam.shortName || match.homeTeam.name}</td>
+                    <td class="px-4 py-2 text-center font-bold">
+                      {match.score.fullTime.home} - {match.score.fullTime.away}
+                    </td>
+                    <td class="px-4 py-2">{match.awayTeam.shortName || match.awayTeam.name}</td>
                   </tr>
                 {/each}
               </tbody>
             </table>
           </div>
-        </div>
-      {/if}
+        {:else}
+          <div class="text-center py-4 text-gray-500 animate-fadein">
+            <p>No previous meetings between these teams</p>
+          </div>
+        {/if}
+      </div>
     </div>
-  </div>
+  {/if}
 </div>
+
+<style>
+  .animate-fadein {
+    animation: fadein 0.7s;
+  }
+  .animate-fadein-slow {
+    animation: fadein 1.2s;
+  }
+  .animate-slidein {
+    animation: slidein 0.7s;
+  }
+  .animate-pop {
+    animation: pop 0.5s;
+  }
+  .animate-shake {
+    animation: shake 0.4s;
+  }
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(16px);}
+    to { opacity: 1; transform: translateY(0);}
+  }
+  @keyframes slidein {
+    from { opacity: 0; transform: translateX(-32px);}
+    to { opacity: 1; transform: translateX(0);}
+  }
+  @keyframes pop {
+    0% { transform: scale(0.8);}
+    60% { transform: scale(1.15);}
+    100% { transform: scale(1);}
+  }
+  @keyframes shake {
+    0% { transform: translateX(0);}
+    20% { transform: translateX(-8px);}
+    40% { transform: translateX(8px);}
+    60% { transform: translateX(-8px);}
+    80% { transform: translateX(8px);}
+    100% { transform: translateX(0);}
+  }
+</style>
