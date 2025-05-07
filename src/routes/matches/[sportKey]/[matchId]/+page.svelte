@@ -31,6 +31,11 @@
   const isLiveMatch = data.match?.status === 'IN_PLAY';
 </script>
 
+<svelte:head>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7287368945352748"
+  crossorigin="anonymous"></script>
+</svelte:head>
+
 <div class="container mx-auto px-4 py-8 animate-fadein">
   {#if !data.matchFound}
     <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-8 animate-shake">

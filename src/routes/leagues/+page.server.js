@@ -5,10 +5,9 @@ export const load = async ({ fetch }) => {
   const leaguesRef = ref(db, 'leagues');
   const snapshot = await get(leaguesRef);
 
-  // Use the same logic as your leagues page: fetch from DB if available
+  // Only fetch from API if "leagues" does not exist in the database
   if (snapshot.exists()) {
-    // Return only the leagues array for the homepage
-    return { leagues: snapshot.val().leagues || [] };
+    return snapshot.val();
   }
 
   // If "leagues" is missing, fetch from API and save to Firebase
@@ -76,8 +75,7 @@ export const load = async ({ fetch }) => {
 
     await set(leaguesRef, leaguesData);
 
-    // Return only the leagues array for the homepage
-    return { leagues: leaguesData.leagues };
+    return leaguesData;
   } catch (error) {
     console.error('API error:', error);
     return {
