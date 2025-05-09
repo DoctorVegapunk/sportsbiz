@@ -41,8 +41,10 @@
     crossorigin="anonymous"></script>
 </svelte:head>
 
-<!-- Top Ad (above hero) -->
-<div class="flex justify-center my-4">
+
+
+<!-- Top AdSense Ad (above hero) -->
+<div class="flex justify-center ">
   <ins class="adsbygoogle"
     style="display:block"
     data-ad-client="ca-pub-7287368945352748"
@@ -65,8 +67,15 @@
   </div>
 </section>
 
-<!-- Ad block between hero and matches -->
-<div class="flex justify-center my-8">
+<!-- Custom Ad 2 (between hero and matches) -->
+<div class="flex justify-center mt-8">
+  <a href="https://moy.auraodin.com/redirect.aspx?pid=135551&bid=1715">
+    <img alt="" src="https://fd-core-fd-prod-02-westeurope-erf4ejfugxdfczfh.z01.azurefd.net/22betpartners/202504041311_320_251.gif" border="0" />
+  </a>
+</div>
+
+<!-- AdSense Ad block between hero and matches -->
+<div class="flex justify-center mb-8">
   <ins class="adsbygoogle"
     style="display:block"
     data-ad-client="ca-pub-7287368945352748"
@@ -124,7 +133,9 @@
     {/each}
   </div>
 
-  <!-- Ad block below matches -->
+
+
+  <!-- AdSense Ad block below matches -->
   <div class="flex justify-center my-8">
     <ins class="adsbygoogle"
       style="display:block"

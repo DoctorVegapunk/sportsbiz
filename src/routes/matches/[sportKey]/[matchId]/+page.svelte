@@ -99,7 +99,12 @@
         {/if}
       </div>
     </div>
-    
+    <div class="flex justify-center my-6">
+      <a href="https://moy.auraodin.com/redirect.aspx?pid=135551&bid=1715" target="_blank"
+        class="px-8 py-3 rounded-lg font-bold text-white text-lg shadow-md transition bg-[#00695c] hover:bg-[#004d40]">
+        BET NOW
+      </a>
+    </div>
     <!-- Match Analysis Section -->
     <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow-md overflow-hidden mb-8 animate-fadein-slow">
       <div class="bg-blue-700 p-3 text-white">
