@@ -2,13 +2,7 @@
   import { onMount } from 'svelte';
   export let data;
   let leagues = data?.leagues || [];
-
-  // Pick matches from the first few leagues as "trending" (or just recent/upcoming matches)
-  let trendingMatches = [];
-  for (const [leagueName, matches] of leagues.slice(0, 3)) {
-    trendingMatches.push(...matches.slice(0, 3));
-  }
-  trendingMatches = trendingMatches.slice(0, 6);
+  let trendingMatches = data?.trendingMatches || [];
 
   function limitWords(str, n = 8) {
     if (!str) return '';
@@ -20,14 +14,11 @@
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
-  // Helper to trigger AdSense after each ad block is rendered
   function loadAds() {
     if (typeof window !== 'undefined' && window.adsbygoogle) {
       try {
         window.adsbygoogle.push({});
-      } catch (e) {
-        // ignore duplicate push errors
-      }
+      } catch (e) {}
     }
   }
 
@@ -35,6 +26,9 @@
     loadAds();
   });
 </script>
+
+
+
 
 <svelte:head>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7287368945352748"
@@ -92,46 +86,43 @@
       Upcoming & Highlighted Matches
     </div>
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 bg-[#f8f9fa] p-4 rounded-b-md">
-    {#each trendingMatches as match}
-      <a href={`/matches/${match.sportKey}/${match.id}`}
-        class="group block bg-white rounded-lg overflow-hidden shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-1 border border-[#e3e6ee]"
-        style="box-shadow: 0 2px 8px rgba(26,35,126,0.06);"
-      >
-        <!-- Card Image (from your static folder, e.g. /sample.jpg) -->
-        <div class="relative">
-          <img
-            src="/sample.jpg"
-            alt="Football pitch or stadium"
-            class="w-full aspect-video object-cover transition-transform duration-200 group-hover:scale-[1.03] bg-[#e3e6ee]"
-            style="aspect-ratio: 16/9;"
-          />
-        </div>
-        <div class="p-4">
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-2">
-              <img src={match.home_team_logo} alt={match.home_team} class="w-6 h-6 object-contain rounded-full bg-[#f8f9fa] border border-[#e3e6ee]" on:error={(e) => e.target.style.display='none'} />
-              <span class="font-semibold text-sm text-[#222]">{limitWords(match.home_team, 3)}</span>
-            </div>
-            <span class="text-[#888] font-bold">vs</span>
-            <div class="flex items-center gap-2">
-              <span class="font-semibold text-sm text-[#222]">{limitWords(match.away_team, 3)}</span>
-              <img src={match.away_team_logo} alt={match.away_team} class="w-6 h-6 object-contain rounded-full bg-[#f8f9fa] border border-[#e3e6ee]" on:error={(e) => e.target.style.display='none'} />
-            </div>
-          </div>
-          <p class="text-[#555] text-xs md:text-sm truncate mb-2 font-sans">
-            <span class="font-semibold text-[#1a237e]">Venue:</span>
-            {match.venue ? ` ${match.venue}` : ' Not available'}
-          </p>
-          <div class="flex items-center text-[11px] md:text-xs text-[#777] space-x-2 font-sans">
-            <span class="flex items-center"><span class="mr-1 text-[10px]">📅</span>{formatDate(match.commence_time)}</span>
-            <span class="mx-1 text-[#bbb]">|</span>
-            <img src={match.sport_emblem} alt="League Logo" class="w-6 h-6 object-contain bg-[#f8f9fa] border border-[#e3e6ee] rounded-full" on:error={(e) => e.target.style.display='none'} />
-          </div>
-        </div>
-      </a>
-    {/each}
+<!-- Trending Matches Section -->
+<section class="max-w-7xl mx-auto px-4 py-12">
+  <div class="w-full mb-7">
+    <div class="border-[#1a237e] px-5 py-3 rounded-t-md text-lg border-2 md:text-xl font-semibold tracking-wide shadow-sm font-sans">
+      {#if trendingMatches.length > 0}
+        Trending Matches
+      {:else}
+        No trending matches yet.
+      {/if}
+    </div>
   </div>
+  {#if trendingMatches.length > 0}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 bg-[#f8f9fa] p-4 rounded-b-md">
+      {#each trendingMatches as match}
+        <a href={`/matches/${match.sportKey}/${match.id}`}
+          class="group block bg-white rounded-lg overflow-hidden shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-1 border border-[#e3e6ee]"
+          style="box-shadow: 0 2px 8px rgba(26,35,126,0.06);"
+        >
+          <div class="flex items-center gap-3 p-4">
+            <img src={match.sport_emblem} alt={match.sport_title} class="w-8 h-8 object-contain" />
+            <div class="font-semibold text-[#1a237e]">{match.sport_title}</div>
+          </div>
+          <div class="px-4 pb-4">
+            <div class="flex items-center gap-2 mb-2">
+              <img src={match.home_team_logo} alt={match.home_team} class="w-6 h-6 object-contain" />
+              <span>{limitWords(match.home_team, 4)}</span>
+              <span class="mx-1 text-gray-400">vs</span>
+              <img src={match.away_team_logo} alt={match.away_team} class="w-6 h-6 object-contain" />
+              <span>{limitWords(match.away_team, 4)}</span>
+            </div>
+            <div class="text-xs text-gray-500">{formatDate(match.commence_time)}</div>
+          </div>
+        </a>
+      {/each}
+    </div>
+  {/if}
+</section>
 
 
 

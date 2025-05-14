@@ -1,6 +1,11 @@
 <script>
-  export let data;
+  import { onMount, onDestroy } from 'svelte';
+  import { getDatabase, ref, runTransaction } from "firebase/database";
+  import { initializeApp, getApps } from "firebase/app";
+  import { browser } from '$app/environment';
   
+  export let data;
+
   // Format date for display
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -29,6 +34,75 @@
   
   // Check if match is live
   const isLiveMatch = data.match?.status === 'IN_PLAY';
+
+  // Firebase configuration
+  const firebaseConfig = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  };
+
+  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  let startTime = 0;
+  let matchId = data.match?.id || data.matchId;
+
+  function recordTimeSpent() {
+    if (!matchId || !browser) return;
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+    if (timeSpent < 3) return;
+    const interestRef = ref(db, `interest/${matchId}`);
+    runTransaction(interestRef, (current) => {
+      if (current === null) {
+        return { timeSpent: timeSpent, clicks: 0 };
+      }
+      return {
+        ...current,
+        timeSpent: (current.timeSpent || 0) + timeSpent
+      };
+    });
+  }
+
+  function recordClick() {
+    if (!matchId || !browser) return;
+    const interestRef = ref(db, `interest/${matchId}`);
+    runTransaction(interestRef, (current) => {
+      if (current === null) {
+        return { timeSpent: 0, clicks: 1 };
+      }
+      return {
+        ...current,
+        clicks: (current.clicks || 0) + 1
+      };
+    });
+  }
+
+  function handleKeydown(event) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      recordClick();
+    }
+  }
+
+  onMount(() => {
+    if (browser) {
+      startTime = Date.now();
+      window.addEventListener('beforeunload', recordTimeSpent);
+    }
+  });
+
+  onDestroy(() => {
+    if (browser) {
+      recordTimeSpent();
+      window.removeEventListener('beforeunload', recordTimeSpent);
+    }
+  });
 </script>
 
 <svelte:head>
@@ -36,16 +110,22 @@
   crossorigin="anonymous"></script>
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 animate-fadein">
+<div 
+  class="container mx-auto px-4 py-8 animate-fadein"
+  on:click={recordClick}
+  on:keydown={handleKeydown}
+  role="button"
+  tabindex="0"
+>
   {#if !data.matchFound}
     <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-8 animate-shake">
       <p>Match not found or error occurred.</p>
       {#if data.error}
-      <p class="text-sm mt-2">Error: {data.error}</p>
-      {#if data.error.includes('rate limit')}
-        <p class="text-xs mt-2 text-orange-600">You have made too many requests. Please wait a minute before trying again.</p>
+        <p class="text-sm mt-2">Error: {data.error}</p>
+        {#if data.error.includes('rate limit')}
+          <p class="text-xs mt-2 text-orange-600">You have made too many requests. Please wait a minute before trying again.</p>
+        {/if}
       {/if}
-    {/if}
     </div>
   {:else}
     <!-- Match Header -->
@@ -82,7 +162,7 @@
       <div class="text-gray-600 space-y-2">
         <p class="animate-fadein">{formatDate(data.match.utcDate)}</p>
         {#if data.venue}
-          <p>Venue: <span class="font-semibold">{data.venue.name}</span>, {data.venue.city}</p>
+          <p>Venue: <span class="font-semibold">{data.venue}</span></p>
         {/if}
         {#if isLiveMatch}
           <div class="inline-block px-3 py-1 bg-red-600 text-white rounded-full text-sm font-bold animate-pulse">
@@ -99,12 +179,7 @@
         {/if}
       </div>
     </div>
-    <div class="flex justify-center my-6">
-      <a href="https://moy.auraodin.com/redirect.aspx?pid=135551&bid=1715" target="_blank"
-        class="px-8 py-3 rounded-lg font-bold text-white text-lg shadow-md transition bg-[#00695c] hover:bg-[#004d40]">
-        BET NOW
-      </a>
-    </div>
+    
     <!-- Match Analysis Section -->
     <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow-md overflow-hidden mb-8 animate-fadein-slow">
       <div class="bg-blue-700 p-3 text-white">

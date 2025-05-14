@@ -2,6 +2,13 @@ import { VITE_FOOTBALL_DATA_API_KEY, VITE_API_FOOTBALL_KEY } from '$env/static/p
 import { db } from '$lib/firebase.js';
 import { get, ref, set } from "firebase/database";
 
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 // Utility to sanitize keys for Firebase (replace . with _)
 function sanitizeKeys(obj) {
   if (Array.isArray(obj)) {

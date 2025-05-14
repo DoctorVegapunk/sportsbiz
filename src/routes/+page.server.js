@@ -1,21 +1,26 @@
 import { db } from '$lib/firebase.js';
 import { get, ref, set } from "firebase/database";
 
+const ONE_DAY = 24 * 60 * 60 * 1000;
+
 export const load = async ({ fetch }) => {
   const leaguesRef = ref(db, 'leagues');
-  const snapshot = await get(leaguesRef);
+  const interestRef = ref(db, 'interest');
+  const [leaguesSnap, interestSnap] = await Promise.all([get(leaguesRef), get(interestRef)]);
 
-  // Use the same logic as your leagues page: fetch from DB if available
-  if (snapshot.exists()) {
-    // Return only the leagues array for the homepage
-    return { leagues: snapshot.val().leagues || [] };
+  let shouldUpdate = true;
+  let leaguesData = null;
+
+  if (leaguesSnap.exists()) {
+    leaguesData = leaguesSnap.val();
+    if (leaguesData.updatedAt && Date.now() - leaguesData.updatedAt < ONE_DAY) {
+      shouldUpdate = false;
+    }
   }
 
-  // If "leagues" is missing, fetch from API and save to Firebase
-  try {
+  if (shouldUpdate) {
     const API_KEY = import.meta.env.VITE_FOOTBALL_DATA_API_KEY;
 
-    // Fetch all available competitions
     const competitionsResponse = await fetch(
       'https://api.football-data.org/v4/competitions',
       {
@@ -29,12 +34,10 @@ export const load = async ({ fetch }) => {
     }
     const competitionsData = await competitionsResponse.json();
 
-    // Filter for soccer/football competitions
     const footballCompetitions = competitionsData.competitions.filter(
       competition => competition.type === 'LEAGUE'
     );
 
-    // Fetch matches for all football leagues
     const allMatches = [];
     for (const competition of footballCompetitions) {
       const response = await fetch(
@@ -61,7 +64,6 @@ export const load = async ({ fetch }) => {
       }
     }
 
-    // Group matches by league
     const matchesByLeague = allMatches.reduce((acc, match) => {
       const league = match.sport_title;
       if (!acc[league]) acc[league] = [];
@@ -69,20 +71,34 @@ export const load = async ({ fetch }) => {
       return acc;
     }, {});
 
-    const leaguesData = {
+    leaguesData = {
       leagues: Object.entries(matchesByLeague),
       updatedAt: Date.now()
     };
 
     await set(leaguesRef, leaguesData);
-
-    // Return only the leagues array for the homepage
-    return { leagues: leaguesData.leagues };
-  } catch (error) {
-    console.error('API error:', error);
-    return {
-      leagues: [],
-      error: error.message
-    };
   }
+
+  // Trending logic
+  let trendingMatches = [];
+  if (interestSnap.exists() && leaguesData?.leagues) {
+    const allMatches = leaguesData.leagues.flatMap(([leagueName, matches]) => matches);
+    const matchMap = Object.fromEntries(allMatches.map(m => [m.id, m]));
+    const interestData = interestSnap.val();
+    const scored = Object.entries(interestData)
+      .map(([matchId, { timeSpent = 0, clicks = 0 }]) => ({
+        match: matchMap[matchId],
+        score: (timeSpent) + (clicks * 10)
+      }))
+      .filter(e => e.match)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map(e => e.match);
+    trendingMatches = scored;
+  }
+
+  return {
+    leagues: leaguesData?.leagues || [],
+    trendingMatches
+  };
 };

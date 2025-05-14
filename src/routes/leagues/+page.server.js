@@ -1,16 +1,27 @@
 import { db } from '$lib/firebase.js';
 import { get, ref, set } from "firebase/database";
 
+const ONE_DAY = 24 * 60 * 60 * 1000;
+
 export const load = async ({ fetch }) => {
   const leaguesRef = ref(db, 'leagues');
   const snapshot = await get(leaguesRef);
 
-  // Only fetch from API if "leagues" does not exist in the database
+  let shouldUpdate = true;
+  let leaguesData = null;
+
   if (snapshot.exists()) {
-    return snapshot.val();
+    leaguesData = snapshot.val();
+    // Check if data is fresh (less than 1 day old)
+    if (leaguesData.updatedAt && Date.now() - leaguesData.updatedAt < ONE_DAY) {
+      shouldUpdate = false;
+    }
   }
 
-  // If "leagues" is missing, fetch from API and save to Firebase
+  if (!shouldUpdate) {
+    return leaguesData;
+  }
+
   try {
     const API_KEY = import.meta.env.VITE_FOOTBALL_DATA_API_KEY;
 
@@ -68,7 +79,7 @@ export const load = async ({ fetch }) => {
       return acc;
     }, {});
 
-    const leaguesData = {
+    leaguesData = {
       leagues: Object.entries(matchesByLeague),
       updatedAt: Date.now()
     };
