@@ -2,6 +2,8 @@
   import { db } from '$lib/firebase';
   import { ref, get, update, query, orderByChild, startAt, endAt } from 'firebase/database';
   import { onMount, onDestroy } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { initAuth, isAuthenticated } from '$lib/auth';
 
   let searchQuery = '';
   let matches = [];
@@ -75,6 +77,29 @@
     clearTimeout(searchTimer);
   });
 
+  // Initialize auth and check if user is logged in
+  onMount(() => {
+    initAuth();
+    const unsubscribe = isAuthenticated.subscribe(authenticated => {
+      if (!authenticated && typeof window !== 'undefined') {
+        window.location.href = '/admin/login';
+      }
+    });
+    
+    return () => unsubscribe();
+  });
+  
+  async function handleLogout() {
+    try {
+      const response = await fetch('/admin/logout');
+      if (response.redirected) {
+        window.location.href = response.url;
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  }
+
   // Open edit modal
   const openEditModal = (match) => {
     selectedMatch = match;
@@ -102,7 +127,15 @@
 </script>
 
 <div class="container mx-auto p-4">
-  <h1 class="text-2xl font-bold mb-6">Match Analysis Dashboard</h1>
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Match Analysis Dashboard</h1>
+    <button 
+      on:click={handleLogout}
+      class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+    >
+      Logout
+    </button>
+  </div>
   
   <!-- Search Bar -->
   <div class="mb-6">

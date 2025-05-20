@@ -1,6 +1,7 @@
 <script>
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { login } from '$lib/auth';
   
   let email = '';
   let password = '';
@@ -20,8 +21,14 @@
       // For now, we'll simulate a successful login
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // Set authentication state
+      login();
+      
+      // Set session cookie
+      document.cookie = 'sessionid=authenticated; path=/; max-age=86400; samesite=lax';
+      
       // Redirect to admin dashboard on successful login
-      goto('/admin/dashboard');
+      window.location.href = '/admin/dashboard';
     } catch (err) {
       error = 'Invalid email or password';
       console.error('Login error:', err);

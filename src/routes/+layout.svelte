@@ -2,7 +2,17 @@
   import { navigating, page } from '$app/stores';
   import { afterNavigate, beforeNavigate } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import { isAuthenticated } from '$lib/auth';
   import "./../app.css";
+  
+  let isAuth = $state(false);
+  
+  if (browser) {
+    isAuthenticated.subscribe(value => {
+      isAuth = value;
+    });
+  }
   
   let { children } = $props();
   let currentPath = $state('');
@@ -39,11 +49,21 @@
     <div class="max-w-7xl mx-auto flex items-center px-4 justify-between">
       <div class="flex items-center">
         <img src="/logo.png" alt="Soccer Ball" width="300" class="drop-shadow-lg" />
-        <a href="/" sveltekit:prefetch class="text-white text-3xl font-bold ml-4"></a>
+        <a href="/" data-sveltekit-prefetch class="text-white text-3xl font-bold ml-4" aria-label="Home">
+          <span class="sr-only">Home</span>
+        </a>
       </div>
-      <nav class="flex space-x-6">
+      <nav class="flex items-center space-x-6">
         <a href="/" class="text-white hover:underline font-semibold">Home</a>
         <a href="/leagues" class="text-white hover:underline font-semibold">Leagues</a>
+        {#if isAuth}
+          <a 
+            href="/admin/dashboard" 
+            class="bg-white text-blue-900 hover:bg-blue-100 px-4 py-2 rounded-md font-semibold transition-colors"
+          >
+            Dashboard
+          </a>
+        {/if}
       </nav>
     </div>
   </header>
