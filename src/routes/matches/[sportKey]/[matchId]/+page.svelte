@@ -186,12 +186,11 @@
         <h2 class="text-lg font-bold">Match Analysis</h2>
       </div>
       <div class="p-4">
-        <p class="text-gray-700">
-          This highly anticipated match brings together two teams with contrasting styles. 
-          Based on current form and historical performance, we can expect an engaging contest 
-          with key battles across the pitch. The outcome may well depend on which team manages 
-          to control the midfield and capitalize on scoring opportunities. <span class="text-red-400 font-bold">JUST A PLACEHOLDER</span>
-        </p>
+        {#if data.analysis}
+          <p class="text-gray-700 whitespace-pre-line">{data.analysis}</p>
+        {:else}
+          <p class="text-gray-500 text-center italic">No Analysis yet</p>
+        {/if}
       </div>
     </div>
     
