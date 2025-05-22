@@ -1,4 +1,4 @@
-<script>
+<!-- <script>
   import { db } from '$lib/firebase';
   import { ref, get, update } from 'firebase/database';
   import { onMount, onDestroy } from 'svelte';
@@ -321,4 +321,4 @@
     border-bottom-left-radius: 0.25rem;
     border-bottom-right-radius: 0.25rem;
   }
-</style>
+</style> -->
