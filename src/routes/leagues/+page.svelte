@@ -11,17 +11,28 @@
     expandedLeagues = new Set();
   });
 
-  // Filter leagues based on search query
+  // Filter leagues based on search query and sort matches by time
   const filteredLeagues = $derived(
-    (data.leagues || []).filter(([leagueName, matches]) => {
-      const searchTerm = searchQuery.toLowerCase();
-      const leagueMatches = leagueName?.toLowerCase().includes(searchTerm);
-      const teamsMatch = matches?.some(match => 
-        match.home_team?.toLowerCase().includes(searchTerm) ||
-        match.away_team?.toLowerCase().includes(searchTerm)
-      );
-      return leagueMatches || teamsMatch;
-    })
+    (data.leagues || [])
+      .map(([leagueName, matches]) => {
+        // Sort matches by date and time (earliest first)
+        const sortedMatches = [...(matches || [])].sort((a, b) => {
+          // Convert both timestamps to milliseconds
+          const timeA = new Date((a.time || a.commence_time || 0) * 1000).getTime();
+          const timeB = new Date((b.time || b.commence_time || 0) * 1000).getTime();
+          return timeA - timeB;
+        });
+        return [leagueName, sortedMatches];
+      })
+      .filter(([leagueName, matches]) => {
+        const searchTerm = searchQuery.toLowerCase();
+        const leagueMatches = leagueName?.toLowerCase().includes(searchTerm);
+        const teamsMatch = matches?.some(match => 
+          match.home_team?.toLowerCase().includes(searchTerm) ||
+          match.away_team?.toLowerCase().includes(searchTerm)
+        );
+        return leagueMatches || teamsMatch;
+      })
   );
 
   // Helper functions
@@ -34,12 +45,27 @@
   };
 
   const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      day: 'numeric',
-      month: 'short'
-    });
+    if (!timestamp) return 'Time not available';
+    
+    try {
+      // Check if timestamp is in seconds (needs * 1000) or milliseconds
+      const date = new Date(timestamp.toString().length === 10 ? timestamp * 1000 : timestamp);
+      if (isNaN(date.getTime())) return 'Invalid time';
+      
+      // Get date components
+      const weekday = date.toLocaleString(undefined, { weekday: 'short' });
+      const month = date.toLocaleString(undefined, { month: 'short' });
+      const day = date.getDate();
+      const hours = date.getHours();
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12; // Convert to 12-hour format
+      
+      return `<span class="font-semibold">${weekday}</span> ${month} ${day} <span class="font-semibold">${displayHours}:${minutes}</span> ${period}`;
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return 'Time format error';
+    }
   };
 </script>
 
@@ -95,7 +121,7 @@
             <div class="divide-y">
               {#each matches as match (match.id)}
                 <a 
-                  href="/matches/{match.sportKey}/{match.id}" 
+                  href="/match/{match.id}" 
                   data-sveltekit-reload
                   class="block p-4 match-hover transition-all duration-200"
                 >
@@ -115,11 +141,11 @@
                     <!-- Match Info -->
                     <div class="mx-4 text-center">
                       <div class="text-gray-500 text-sm">
-                        {formatTime(match.commence_time)}
+                        {@html formatTime(match.time || match.commence_time)}
                       </div>
                       <div class="text-xl font-bold my-1">VS</div>
                       <div class="text-sm text-gray-500">
-                        {match.sport_title}
+                        {match.league?.name || match.sport_title || 'Match'}
                       </div>
                     </div>
 
