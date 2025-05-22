@@ -1,5 +1,6 @@
 import { firestore } from '$lib/firebase.js';
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { error } from '@sveltejs/kit';
 
 // Helper function to list all matches in the database (for debugging)
 async function listAllMatches() {
@@ -50,14 +51,11 @@ export async function load({ params }) {
       console.log('Match not found in Firestore');
       // List all available matches to help with debugging
       await listAllMatches();
-      return {
-        matchFound: false,
-        error: 'Match not found in the database',
-        debug: {
-          matchId,
-          timestamp: new Date().toISOString()
-        }
-      };
+      
+      // Throw a 404 error to trigger the error page
+      throw error(404, {
+        message: 'Match not found in the database'
+      });
     }
 
     const matchData = matchSnap.data();
@@ -105,11 +103,17 @@ export async function load({ params }) {
       predictions: {}, // Can be added later
       error: null
     };
-  } catch (error) {
-    console.error('Error fetching match data:', error);
-    return {
-      matchFound: false,
-      error: 'Failed to load match data. Please try again later.'
-    };
+  } catch (err) {
+    console.error('Error fetching match data:', err);
+    
+    // If it's already a SvelteKit error, re-throw it
+    if (err.status) {
+      throw err;
+    }
+    
+    // Otherwise, throw a 500 error for unexpected errors
+    throw error(500, {
+      message: 'Failed to load match data. Please try again later.'
+    });
   }
 }

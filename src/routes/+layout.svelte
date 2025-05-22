@@ -82,7 +82,7 @@
   </main>
 
   <!-- Footer -->
-  <footer style="background-color:#000066;" class="text-white py-6 mt-12 shadow-inner">
+  <footer style="background-color:#000066;" class="text-white py-6 shadow-inner">
     <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
       <div class="flex items-center mb-2 md:mb-0">
         <img src="/logo.png" alt="Soccer Ball" width="150" class="drop-shadow-lg" />
