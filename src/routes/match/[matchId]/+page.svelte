@@ -146,6 +146,15 @@
 <svelte:head>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7287368945352748"
   crossorigin="anonymous"></script>
+  
+  <!-- SEO Meta Tags -->
+  {#if data.match}
+    <title>{data.match.homeTeam.name} vs {data.match.awayTeam.name} - {data.match.league?.name || 'Football Match'} Prediction & Analysis</title>
+    <meta name="description" content="Expert analysis and prediction for {data.match.homeTeam.name} vs {data.match.awayTeam.name} in {data.match.league?.name || 'Football'}. Get insights on team form, key players, and match predictions." />
+    <meta property="og:title" content="{data.match.homeTeam.name} vs {data.match.awayTeam.name} - Match Analysis" />
+    <meta property="og:description" content="Expert football analysis and prediction for the upcoming match between {data.match.homeTeam.name} and {data.match.awayTeam.name}." />
+    <meta property="og:type" content="article" />
+  {/if}
 </svelte:head>
 
 <div 
@@ -270,13 +279,13 @@
     </div>
     
     <!-- Match Analysis Section -->
-    <div class=" rounded-lg shadow-md overflow-hidden mb-8 animate-fadein-slow">
+    <div class="rounded-lg shadow-md overflow-hidden mb-8 animate-fadein-slow">
       <button 
         style="background-color:#000066;"
-        class="w-full text-left p-3 text-white flex justify-between items-center"
+        class="w-full text-left p-3 text-white flex justify-between items-center hover:bg-opacity-90 transition-colors duration-200"
         on:click|preventDefault={() => showAnalysis = !showAnalysis}
       >
-        <h2 class="text-lg font-bold">Match Analysis</h2>
+        <h2 class="text-lg font-bold">AI Match Analysis & Prediction</h2>
         <svg 
           class={`w-5 h-5 transition-transform duration-200 ${showAnalysis ? 'rotate-180' : ''}`} 
           fill="none" 
@@ -288,11 +297,17 @@
         </svg>
       </button>
       {#if showAnalysis}
-        <div class="p-4">
+        <div class="p-6 bg-white">
           {#if data.analysis}
-            <p class="text-gray-700 whitespace-pre-line">{data.analysis}</p>
+            <div class="text-gray-700 leading-relaxed analysis-content">
+              {@html data.analysis}
+            </div>
           {:else}
-            <p class="text-gray-500 text-center italic">No analysis available for this match yet.</p>
+            <div class="text-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p class="text-gray-500 italic">Generating AI analysis...</p>
+              <p class="text-sm text-gray-400 mt-2">This may take a few moments</p>
+            </div>
           {/if}
         </div>
       {/if}
@@ -316,6 +331,26 @@
   .animate-shake {
     animation: shake 0.4s;
   }
+  
+  /* Enhanced styles for AI analysis content */
+  .analysis-content :global(strong) {
+    font-weight: bold;
+    color: #111827;
+  }
+  
+  .analysis-content :global(em) {
+    font-style: italic;
+    color: #1d4ed8;
+  }
+  
+  .analysis-content :global(p) {
+    margin-bottom: 0.75rem;
+  }
+  
+  .analysis-content :global(br) {
+    margin-bottom: 0.5rem;
+  }
+  
   @keyframes fadein {
     from { opacity: 0; transform: translateY(16px);}
     to { opacity: 1; transform: translateY(0);}

@@ -21,6 +21,7 @@
 		"@tailwindcss/vite": "^4.1.5",
 		"@tiptap/pm": "^2.12.0",
 		"firebase": "^11.6.1",
+		"groq-sdk": "^0.22.0",
 		"isomorphic-dompurify": "^2.25.0",
 		"marked": "^15.0.12",
 		"tailwindcss": "^4.1.5"
