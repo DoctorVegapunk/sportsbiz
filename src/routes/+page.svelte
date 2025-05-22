@@ -87,7 +87,7 @@
     </div>
   </div>
 <!-- Trending Matches Section -->
-<section class="max-w-7xl mx-auto px-4 py-12">
+<!-- <section class="max-w-7xl mx-auto px-4 py-12">
   <div class="w-full mb-7">
     <div class="border-[#1a237e] px-5 py-3 rounded-t-md text-lg border-2 md:text-xl font-semibold tracking-wide shadow-sm font-sans">
       {#if trendingMatches.length > 0}
@@ -122,7 +122,7 @@
       {/each}
     </div>
   {/if}
-</section>
+</section> -->
 
 
 
