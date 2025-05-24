@@ -1,10 +1,8 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
-  import { browser } from '$app/environment';
-  import { trackMatchInteraction } from '$lib/analytics';
-  
-  // Prevent ReferenceError in production if recordClick is not defined elsewhere
+
+  // Prevent ReferenceError in production if recordClick or handleKeydown are not defined elsewhere
   function recordClick() {}
+  function handleKeydown() {}
   
   // State for number of matches to show
   let showLimit = 5; // Default to showing 5 matches
