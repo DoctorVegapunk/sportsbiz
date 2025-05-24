@@ -29,7 +29,7 @@
       
       return `<span class="font-semibold">${weekday}</span> ${month} ${day} <span class="font-semibold">${displayHours}:${minutes}</span> ${period}`;
     } catch (error) {
-      console.error('Error formatting time:', error);
+      // console.error('Error formatting time:', error);
       return 'Time format error';
     }
   };

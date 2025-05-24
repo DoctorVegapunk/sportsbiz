@@ -89,7 +89,7 @@ export const load = async ({ fetch }) => {
   // Get trending matches from analytics collection
   let trendingMatches = [];
   try {
-    console.log('Fetching trending matches from analytics collection...');
+    
     const firestore = getFirestore();
     
     // Get all documents from analytics collection
@@ -97,12 +97,12 @@ export const load = async ({ fetch }) => {
     const analyticsSnapshot = await getDocs(analyticsRef);
     
     if (!analyticsSnapshot.empty) {
-      console.log('Number of analytics docs found:', analyticsSnapshot.docs.length);
+      
       // Get all match documents in parallel
       const matchPromises = analyticsSnapshot.docs.map(async (analyticsDoc) => {
         const analyticsData = analyticsDoc.data();
         const matchId = analyticsData.matchId; // Get matchId from the document data
-        console.log('Processing analytics doc:', analyticsDoc.id, 'with matchId:', matchId);
+        
         
         if (!matchId) {
           console.warn('Analytics document missing matchId:', analyticsDoc.id);
@@ -113,7 +113,7 @@ export const load = async ({ fetch }) => {
           // Get the match document from matches collection
           const matchDoc = await getDoc(doc(firestore, 'matches', matchId));
           if (matchDoc.exists()) {
-            console.log('Match doc found for matchId:', matchId);
+            
             const matchData = matchDoc.data();
             
             // Helper function to convert Firestore timestamps to ISO strings
@@ -226,9 +226,9 @@ export const load = async ({ fetch }) => {
         .filter(match => match !== null)
         .sort((a, b) => ((b._meta?.analytics?.interestRating || 0) - (a._meta?.analytics?.interestRating || 0)));
       
-      console.log(`Found ${trendingMatches.length} trending matches`, trendingMatches);
+      
     } else {
-      console.log('No documents found in analytics collection');
+      
     }
   } catch (error) {
     console.error('Error fetching trending matches:', error);

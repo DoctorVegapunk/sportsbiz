@@ -3,6 +3,9 @@
   import { browser } from '$app/environment';
   import { trackMatchInteraction } from '$lib/analytics';
   
+  // Prevent ReferenceError in production if recordClick is not defined elsewhere
+  function recordClick() {}
+  
   // State for number of matches to show
   let showLimit = 5; // Default to showing 5 matches
   
