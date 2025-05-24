@@ -97,10 +97,12 @@ export const load = async ({ fetch }) => {
     const analyticsSnapshot = await getDocs(analyticsRef);
     
     if (!analyticsSnapshot.empty) {
+      console.log('Number of analytics docs found:', analyticsSnapshot.docs.length);
       // Get all match documents in parallel
       const matchPromises = analyticsSnapshot.docs.map(async (analyticsDoc) => {
         const analyticsData = analyticsDoc.data();
         const matchId = analyticsData.matchId; // Get matchId from the document data
+        console.log('Processing analytics doc:', analyticsDoc.id, 'with matchId:', matchId);
         
         if (!matchId) {
           console.warn('Analytics document missing matchId:', analyticsDoc.id);
@@ -111,6 +113,7 @@ export const load = async ({ fetch }) => {
           // Get the match document from matches collection
           const matchDoc = await getDoc(doc(firestore, 'matches', matchId));
           if (matchDoc.exists()) {
+            console.log('Match doc found for matchId:', matchId);
             const matchData = matchDoc.data();
             
             // Helper function to convert Firestore timestamps to ISO strings
@@ -180,7 +183,34 @@ export const load = async ({ fetch }) => {
             return match;
           } else {
             console.warn(`Match not found: ${matchId} (from analytics doc ${analyticsDoc.id})`);
-            return null;
+            // Return a placeholder object for debugging in the UI
+            return {
+              id: matchId,
+              league: {
+                name: `Missing match: ${matchId}`,
+                logo: 'https://via.placeholder.com/30',
+              },
+              home_team: 'Unknown',
+              away_team: 'Unknown',
+              home_team_logo: 'https://via.placeholder.com/50',
+              away_team_logo: 'https://via.placeholder.com/50',
+              status: 'Not Found',
+              score: { home: null, away: null },
+              date: 'N/A',
+              timestamp: 0,
+              _meta: {
+                venue: 'N/A',
+                analysis: '',
+                analytics: {
+                  interestRating: analyticsData.interestRating || 0,
+                  clicks: analyticsData.clicks || 0,
+                  pageViews: analyticsData.pageViews || 0,
+                  timeSpent: analyticsData.timeSpent || 0,
+                  shares: analyticsData.shares || 0
+                },
+                headToHead: null
+              }
+            };
           }
         } catch (error) {
           console.error(`Error processing match ${matchId}:`, error);
@@ -194,9 +224,9 @@ export const load = async ({ fetch }) => {
       // Filter out nulls and sort by interest rating (highest first)
       trendingMatches = matches
         .filter(match => match !== null)
-        .sort((a, b) => (b.analytics.interestRating || 0) - (a.analytics.interestRating || 0));
+        .sort((a, b) => ((b._meta?.analytics?.interestRating || 0) - (a._meta?.analytics?.interestRating || 0)));
       
-      console.log(`Found ${trendingMatches.length} trending matches`);
+      console.log(`Found ${trendingMatches.length} trending matches`, trendingMatches);
     } else {
       console.log('No documents found in analytics collection');
     }

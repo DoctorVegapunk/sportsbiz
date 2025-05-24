@@ -106,6 +106,7 @@
       Upcoming & Highlighted Matches
     </div>
   </div>
+<!-- <pre class="bg-yellow-100 text-xs text-black p-2 rounded mb-4">TrendingMatches Debug: {typeof trendingMatches} {JSON.stringify(trendingMatches, null, 2)}</pre> -->
 <!-- Trending Matches Section -->
 <section class="max-w-7xl mx-auto px-4 py-12">
   <div class="w-full mb-7">
