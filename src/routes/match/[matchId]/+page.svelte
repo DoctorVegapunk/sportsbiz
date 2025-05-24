@@ -4,6 +4,9 @@
   import { initializeApp, getApps } from "firebase/app";
   import { browser } from '$app/environment';
   
+  // State for number of matches to show
+  let showLimit = 5; // Default to showing 5 matches
+  
   export let data;
   
   // Show analysis by default if match hasn't started yet
@@ -277,41 +280,98 @@
         {/if}
       </div>
     </div>
-    
+
     <!-- Match Analysis Section -->
-    <div class="rounded-lg shadow-md overflow-hidden mb-8 animate-fadein-slow">
-      <button 
-        style="background-color:#000066;"
-        class="w-full text-left p-3 text-white flex justify-between items-center hover:bg-opacity-90 transition-colors duration-200"
-        on:click|preventDefault={() => showAnalysis = !showAnalysis}
-      >
-        <h2 class="text-lg font-bold">AI Match Analysis & Prediction</h2>
-        <svg 
-          class={`w-5 h-5 transition-transform duration-200 ${showAnalysis ? 'rotate-180' : ''}`} 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-        </svg>
-      </button>
-      {#if showAnalysis}
-        <div class="p-6 bg-white">
-          {#if data.analysis}
-            <div class="text-gray-700 leading-relaxed analysis-content">
-              {@html data.analysis}
-            </div>
-          {:else}
-            <div class="text-center py-8">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p class="text-gray-500 italic">Generating AI analysis...</p>
-              <p class="text-sm text-gray-400 mt-2">This may take a few moments</p>
-            </div>
-          {/if}
-        </div>
-      {/if}
+    <div class="border-2 border-gray-400 rounded-lg shadow-md overflow-hidden mb-8 animate-fadein-slow">
+      <div style="background-color:#000066;" class="w-full text-left p-4 text-white">
+        <h2 class="text-xl font-bold">AI Match Analysis & Prediction</h2>
+      </div>
+      
+      <div class="p-6 bg-white border-t border-gray-100">
+        {#if data.analysis}
+          <div class="prose max-w-none">
+            {@html data.analysis}
+          </div>
+        {:else}
+          <div class="text-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p class="text-gray-500 italic">Generating AI analysis...</p>
+            <p class="text-sm text-gray-400 mt-2">This may take a few moments</p>
+          </div>
+        {/if}
+      </div>
     </div>
+
+    <!-- Head to Head Section -->
+    {#if data.h2h?.length > 0}
+      <div class="border-2 border-gray-400 rounded-lg shadow-md overflow-hidden mb-8 animate-fadein">
+        <div style="background-color:#000066;" class="w-full flex justify-between items-center p-4 text-white">
+          <h2 class="text-xl font-bold">Head to Head History</h2>
+          <div class="flex items-center space-x-2">
+            <span class="text-sm">Show:</span>
+            <select 
+              class="bg-white text-gray-800 rounded px-2 py-1 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              bind:value={showLimit}
+            >
+              <option value={5}>5 matches</option>
+              <option value={10}>10 matches</option>
+              <option value={15}>15 matches</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Team</th>
+                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Away Team</th>
+                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Competition</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              {#each data.h2h.slice(0, showLimit) as match}
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(match.date).toLocaleDateString()}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      {#if match.homeTeamLogo}
+                        <img class="h-6 w-6 mr-2" src={match.homeTeamLogo} alt={match.homeTeam} />
+                      {/if}
+                      <span class="text-sm font-medium text-gray-900">{match.homeTeam}</span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-center">
+                      <span class="px-2 py-1 rounded-full text-sm font-medium
+                        {match.winner === 'home' ? 'bg-green-100 text-green-800' : 
+                         match.winner === 'away' ? 'bg-red-100 text-red-800' : 
+                         'bg-gray-100 text-gray-800'}">
+                        {match.homeGoals} - {match.awayGoals}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center justify-end">
+                      <span class="text-sm font-medium text-gray-900">{match.awayTeam}</span>
+                      {#if match.awayTeamLogo}
+                        <img class="h-6 w-6 ml-2" src={match.awayTeamLogo} alt={match.awayTeam} />
+                      {/if}
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                    {match.competition}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -332,24 +392,7 @@
     animation: shake 0.4s;
   }
   
-  /* Enhanced styles for AI analysis content */
-  .analysis-content :global(strong) {
-    font-weight: bold;
-    color: #111827;
-  }
-  
-  .analysis-content :global(em) {
-    font-style: italic;
-    color: #1d4ed8;
-  }
-  
-  .analysis-content :global(p) {
-    margin-bottom: 0.75rem;
-  }
-  
-  .analysis-content :global(br) {
-    margin-bottom: 0.5rem;
-  }
+  /* Content styles */
   
   @keyframes fadein {
     from { opacity: 0; transform: translateY(16px);}

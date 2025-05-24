@@ -1,8 +1,139 @@
 import { firestore } from '$lib/firebase.js';
-import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from "firebase/firestore";
+
 import { error } from '@sveltejs/kit';
 import { Groq } from 'groq-sdk';
-import { VITE_GROQ_API_KEY } from '$env/static/private';
+import { VITE_GROQ_API_KEY, VITE_API_FOOTBALL_KEY } from '$env/static/private';
+
+// Function to clean up old match data
+async function cleanupOldMatches() {
+  try {
+    const today = startOfDay(new Date());
+    const matchesRef = collection(firestore, 'matches');
+    const q = query(matchesRef, where('utcDate', '<', today));
+    
+    const querySnapshot = await getDocs(q);
+    const deletePromises = [];
+    
+    querySnapshot.forEach((doc) => {
+      deletePromises.push(deleteDoc(doc.ref));
+    });
+    
+    await Promise.all(deletePromises);
+    console.log(`Cleaned up ${deletePromises.length} old matches`);
+    return deletePromises.length;
+  } catch (error) {
+    console.error('Error cleaning up old matches:', error);
+    return 0;
+  }
+}
+
+// Function to fetch head-to-head data from the API
+async function fetchHeadToHead(homeTeamId, awayTeamId) {
+  if (!homeTeamId || !awayTeamId) {
+    return [];
+  }
+  
+  try {
+    const url = `https://v3.football.api-sports.io/fixtures/headtohead?h2h=${homeTeamId}-${awayTeamId}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': 'v3.football.api-sports.io',
+        'x-rapidapi-key': VITE_API_FOOTBALL_KEY
+      }
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = await response.json();
+    return Array.isArray(data?.response) ? data.response : [];
+  } catch (error) {
+    console.error('Error in fetchHeadToHead:', error);
+    return [];
+  }
+}
+
+// Function to process and store head-to-head data
+async function processHeadToHead(matchDoc, homeTeamId, awayTeamId) {
+  console.log('Processing head-to-head for match:', matchDoc.id);
+  console.log('Home Team ID:', homeTeamId, 'Away Team ID:', awayTeamId);
+  
+  try {
+    // Check if we already have recent head-to-head data (less than 24 hours old)
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    
+    console.log('Checking for existing head-to-head data...');
+    console.log('Current match doc:', JSON.stringify(matchDoc, null, 2));
+    
+    if (matchDoc.headToHead?.updatedAt?.toDate() > oneDayAgo) {
+      console.log('Using cached head-to-head data');
+      return matchDoc.headToHead.matches || [];
+    } else {
+      console.log('No recent cached data found, will fetch from API');
+    }
+    
+    // If no recent data, fetch from API
+    console.log('Fetching head-to-head data from API...');
+    const h2hData = await fetchHeadToHead(homeTeamId, awayTeamId, 5);
+    console.log('API response:', JSON.stringify(h2hData, null, 2));
+    
+    if (!h2hData || h2hData.length === 0) {
+      console.log('No head-to-head data returned from API');
+      return [];
+    }
+    
+    // Process the data to only keep what we need
+    const processedMatches = h2hData.map(match => ({
+      id: match.fixture.id,
+      date: match.fixture.date,
+      homeTeam: match.teams.home.name,
+      homeTeamLogo: match.teams.home.logo,
+      awayTeam: match.teams.away.name,
+      awayTeamLogo: match.teams.away.logo,
+      homeGoals: match.goals.home,
+      awayGoals: match.goals.away,
+      competition: match.league.name,
+      status: match.fixture.status.short,
+      winner: match.goals.home > match.goals.away ? 'home' : 
+             match.goals.away > match.goals.home ? 'away' : 'draw'
+    }));
+    
+    // Update the match document with the new head-to-head data
+    const updateData = {
+      headToHead: {
+        matches: processedMatches,
+        updatedAt: new Date()
+      }
+    };
+    
+    console.log('Updating match document with head-to-head data:', JSON.stringify(updateData, null, 2));
+    
+    const matchRef = doc(firestore, 'matches', matchDoc.id);
+    console.log('Match reference path:', matchRef.path);
+    
+    try {
+      await updateDoc(matchRef, updateData);
+      console.log('Successfully updated match document with head-to-head data');
+    } catch (updateError) {
+      console.error('Error updating match document:', updateError);
+      throw updateError; // Re-throw to be caught by the outer try-catch
+    }
+    
+    return processedMatches;
+  } catch (error) {
+    console.error('Error processing head-to-head data:', error);
+    return [];
+  }
+}
+
+console.log('Environment Variables Loaded:', {
+  hasGroqKey: !!VITE_GROQ_API_KEY,
+  hasFootballKey: !!VITE_API_FOOTBALL_KEY
+});
 
 // Initialize Groq client
 const groq = new Groq({
@@ -103,6 +234,13 @@ async function listAllMatches() {
 }
 
 export async function load({ params }) {
+  // Clean up old matches before loading new data
+  try {
+    await cleanupOldMatches();
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+  }
+  
   const { matchId } = params;
   console.log('Looking for match with ID:', matchId);
   
@@ -115,35 +253,37 @@ export async function load({ params }) {
     console.log('Match document exists:', matchSnap.exists());
 
     if (!matchSnap.exists()) {
-      console.log('Match not found in Firestore');
-      // List all available matches to help with debugging
-      await listAllMatches();
-      
-      // Throw a 404 error to trigger the error page
-      throw error(404, {
-        message: 'Match not found in the database'
-      });
+      throw error(404, 'Match not found');
     }
 
     const matchData = matchSnap.data();
-    console.log('Retrieved match data:', JSON.stringify(matchData, null, 2));
-
-    // Generate AI analysis if it doesn't exist
-    let analysis = matchData.analysis || null;
     
-    if (!analysis) {
-      console.log('No analysis found, generating AI analysis...');
-      analysis = await generateMatchAnalysis(matchData);
-      
+    // Generate AI analysis if not already present or if it's older than 24 hours
+    if (!matchData.analysis || 
+        (matchData.analysisGeneratedAt && 
+         new Date() - new Date(matchData.analysisGeneratedAt) > 24 * 60 * 60 * 1000)) {
+      const analysis = await generateMatchAnalysis(matchData);
       if (analysis) {
-        // Save the generated analysis back to Firestore
         await saveAnalysisToFirestore(matchId, analysis);
-        console.log('AI analysis generated and saved');
-      } else {
-        console.log('Failed to generate AI analysis');
+        matchData.analysis = analysis;
       }
-    } else {
-      console.log('Using existing analysis from database');
+    }
+    
+    // Get head-to-head data
+    let h2h = [];
+    console.log('Match data:', JSON.stringify(matchData, null, 2));
+    
+    if (matchData.home_team_id && matchData.away_team_id) {
+      console.log('Fetching head-to-head data...');
+      try {
+        h2h = await processHeadToHead({
+          id: matchId,
+          ...matchData
+        }, matchData.home_team_id, matchData.away_team_id);
+        console.log('Processed head-to-head data:', JSON.stringify(h2h, null, 2));
+      } catch (h2hError) {
+        console.error('Error processing head-to-head data:', h2hError);
+      }
     }
 
     // Format the match data to match what the frontend expects
@@ -184,8 +324,9 @@ export async function load({ params }) {
       homeTeamStanding: null, // These can be populated if needed
       awayTeamStanding: null, // These can be populated if needed
       venue: matchData.venue,
-      analysis: analysis, // Include the AI-generated or existing analysis
+      analysis: matchData.analysis, // Use the updated analysis from matchData
       predictions: {}, // Can be added later
+      h2h: h2h || [], // Include the head-to-head data
       error: null
     };
   } catch (err) {
