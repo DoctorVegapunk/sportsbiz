@@ -176,7 +176,7 @@
     .text-base { font-size: 1rem !important; }
     .text-lg { font-size: 1.1rem !important; }
   }
-  section, p, a, span {
+  section, h1, h2, h3, p, a, span {
     font-family: 'Roboto', 'Segoe UI', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

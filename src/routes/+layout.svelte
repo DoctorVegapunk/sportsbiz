@@ -1,4 +1,9 @@
 <script>
+  import { navigating, page } from '$app/stores';
+  import { afterNavigate, beforeNavigate } from '$app/navigation';
+  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import { isAuthenticated } from '$lib/auth';
   import "./../app.css";
   
   let isAuth = $state(false);
