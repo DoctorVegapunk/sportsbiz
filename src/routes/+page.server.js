@@ -1,13 +1,13 @@
 // src/routes/+page.server.js
 import { db } from '$lib/firebase.js';
 import { get, ref, set } from "firebase/database";
-import { getTrendingMatches } from '$lib/analytics.js';
+import { getFirestore, collection, getDocs, getDoc, doc } from 'firebase/firestore';
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
 export const load = async ({ fetch }) => {
   const leaguesRef = ref(db, 'leagues');
-  const [leaguesSnap] = await Promise.all([get(leaguesRef)]);
+  const leaguesSnap = await get(leaguesRef);
 
   let shouldUpdate = true;
   let leaguesData = null;
@@ -79,75 +79,126 @@ export const load = async ({ fetch }) => {
 
     leaguesData = {
       leagues: Object.entries(matchesByLeague),
-      allMatches: allMatches, // Store all matches for trending lookup
+      allMatches: allMatches,
       updatedAt: Date.now()
     };
 
     await set(leaguesRef, leaguesData);
   }
 
-  // Get trending matches from Firestore analytics
+  // Get trending matches from analytics collection
   let trendingMatches = [];
   try {
-    console.log('Fetching trending matches from analytics...');
-    const trendingData = await getTrendingMatches(20);
+    console.log('Fetching trending matches from analytics collection...');
+    const firestore = getFirestore();
     
-    if (trendingData.length > 0 && leaguesData?.allMatches) {
-      // Create a map of matches by ID for quick lookup
-      const matchMap = Object.fromEntries(
-        leaguesData.allMatches.map(m => [m.id, m])
-      );
+    // Get all documents from analytics collection
+    const analyticsRef = collection(firestore, 'analytics');
+    const analyticsSnapshot = await getDocs(analyticsRef);
+    
+    if (!analyticsSnapshot.empty) {
+      // Get all match documents in parallel
+      const matchPromises = analyticsSnapshot.docs.map(async (analyticsDoc) => {
+        const analyticsData = analyticsDoc.data();
+        const matchId = analyticsData.matchId; // Get matchId from the document data
+        
+        if (!matchId) {
+          console.warn('Analytics document missing matchId:', analyticsDoc.id);
+          return null;
+        }
+        
+        try {
+          // Get the match document from matches collection
+          const matchDoc = await getDoc(doc(firestore, 'matches', matchId));
+          if (matchDoc.exists()) {
+            const matchData = matchDoc.data();
+            
+            // Helper function to convert Firestore timestamps to ISO strings
+            const convertTimestamp = (timestamp) => {
+              if (!timestamp) return null;
+              if (timestamp.toDate) return timestamp.toDate().toISOString();
+              if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toISOString();
+              return timestamp;
+            };
+            
+            // Format the match date
+            const matchDate = matchData.time ? new Date(matchData.time * 1000) : new Date();
+            const formattedDate = matchDate.toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+            });
 
-      // Match trending data with actual match details
-      trendingMatches = trendingData
-        .map(trending => {
-          const match = matchMap[trending.matchId];
-          if (match) {
-            return {
-              ...match,
-              analytics: {
-                interestRating: trending.interestRating,
-                clicks: trending.clicks,
-                timeSpent: trending.timeSpent,
-                pageViews: trending.pageViews,
-                shares: trending.shares || 0
+            // Prepare the match data in the exact format expected by the frontend
+            const match = {
+              id: matchDoc.id,
+              // League info for the header
+              league: {
+                name: matchData.league?.name || 'Unknown League',
+                logo: matchData.league?.logo || 'https://via.placeholder.com/30',
+              },
+              // Teams data
+              home_team: matchData.home_team || 'Home Team',
+              away_team: matchData.away_team || 'Away Team',
+              home_team_logo: matchData.home_team_logo || 'https://via.placeholder.com/50',
+              away_team_logo: matchData.away_team_logo || 'https://via.placeholder.com/50',
+              // Match status and scores
+              status: matchData.status || 'Not Started',
+              score: {
+                home: matchData.score?.home,
+                away: matchData.score?.away
+              },
+              // Formatted date string
+              date: formattedDate,
+              // Raw timestamp for sorting
+              timestamp: matchData.time || 0,
+              // Additional data (not shown in card but might be needed elsewhere)
+              _meta: {
+                venue: matchData.venue || 'TBD',
+                analysis: matchData.analysis || '',
+                analytics: {
+                  interestRating: analyticsData.interestRating || 0,
+                  clicks: analyticsData.clicks || 0,
+                  pageViews: analyticsData.pageViews || 0,
+                  timeSpent: analyticsData.timeSpent || 0,
+                  shares: analyticsData.shares || 0
+                },
+                // Keep headToHead data but don't include in the main card
+                headToHead: matchData.headToHead ? {
+                  updatedAt: convertTimestamp(matchData.headToHead.updatedAt),
+                  matches: (matchData.headToHead.matches || []).map(h2h => ({
+                    ...h2h,
+                    date: h2h.date ? new Date(h2h.date).toISOString() : null
+                  }))
+                } : null
               }
             };
+            
+            return match;
+          } else {
+            console.warn(`Match not found: ${matchId} (from analytics doc ${analyticsDoc.id})`);
+            return null;
           }
+        } catch (error) {
+          console.error(`Error processing match ${matchId}:`, error);
           return null;
-        })
+        }
+      });
+      
+      // Wait for all match fetches to complete
+      const matches = await Promise.all(matchPromises);
+      
+      // Filter out nulls and sort by interest rating (highest first)
+      trendingMatches = matches
         .filter(match => match !== null)
-        .slice(0, 20); // Ensure we don't exceed 20 matches
-
+        .sort((a, b) => (b.analytics.interestRating || 0) - (a.analytics.interestRating || 0));
+      
       console.log(`Found ${trendingMatches.length} trending matches`);
     } else {
-      console.log('No trending data found or no matches available');
-      
-      // Fallback: show some recent matches if no trending data exists
-      if (leaguesData?.allMatches) {
-        const recentMatches = leaguesData.allMatches
-          .filter(match => {
-            const matchDate = new Date(match.commence_time);
-            const now = new Date();
-            const daysDiff = (matchDate - now) / (1000 * 60 * 60 * 24);
-            return daysDiff >= 0 && daysDiff <= 7; // Matches in the next 7 days
-          })
-          .sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time))
-          .slice(0, 6)
-          .map(match => ({
-            ...match,
-            analytics: {
-              interestRating: 0,
-              clicks: 0,
-              timeSpent: 0,
-              pageViews: 0,
-              shares: 0
-            }
-          }));
-        
-        trendingMatches = recentMatches;
-        console.log(`Using ${recentMatches.length} recent matches as fallback`);
-      }
+      console.log('No documents found in analytics collection');
     }
   } catch (error) {
     console.error('Error fetching trending matches:', error);

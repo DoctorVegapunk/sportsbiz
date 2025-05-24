@@ -1,8 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { getDatabase, ref, runTransaction } from "firebase/database";
-  import { initializeApp, getApps } from "firebase/app";
   import { browser } from '$app/environment';
+  import { trackMatchInteraction } from '$lib/analytics';
   
   // State for number of matches to show
   let showLimit = 5; // Default to showing 5 matches
@@ -76,72 +75,42 @@
     return timeDiff > 135; // More than 2 hours 15 minutes (135 minutes)
   };
 
-  // Firebase configuration
-  const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
-    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-  };
-
-  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
   let startTime = 0;
   let matchId = data.match?.id || data.matchId;
+  let timeInterval;
 
-  function recordTimeSpent() {
+  // Track time spent on page
+  function trackTimeSpent() {
     if (!matchId || !browser) return;
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-    if (timeSpent < 3) return;
-    const interestRef = ref(db, `interest/${matchId}`);
-    runTransaction(interestRef, (current) => {
-      if (current === null) {
-        return { timeSpent: timeSpent, clicks: 0 };
-      }
-      return {
-        ...current,
-        timeSpent: (current.timeSpent || 0) + timeSpent
-      };
-    });
-  }
-
-  function recordClick() {
-    if (!matchId || !browser) return;
-    const interestRef = ref(db, `interest/${matchId}`);
-    runTransaction(interestRef, (current) => {
-      if (current === null) {
-        return { timeSpent: 0, clicks: 1 };
-      }
-      return {
-        ...current,
-        clicks: (current.clicks || 0) + 1
-      };
-    });
-  }
-
-  function handleKeydown(event) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      recordClick();
+    if (timeSpent > 3) { // Only track if spent more than 3 seconds
+      trackMatchInteraction(matchId, 'timeSpent', { timeSpent });
     }
   }
 
   onMount(() => {
     if (browser) {
       startTime = Date.now();
-      window.addEventListener('beforeunload', recordTimeSpent);
+      
+      // Track page view
+      trackMatchInteraction(matchId, 'pageView');
+      
+      // Set up time tracking interval (every 30 seconds)
+      timeInterval = setInterval(() => {
+        trackTimeSpent();
+        startTime = Date.now(); // Reset timer after each interval
+      }, 30000);
+      
+      // Track time on page unload
+      window.addEventListener('beforeunload', trackTimeSpent);
     }
   });
 
   onDestroy(() => {
     if (browser) {
-      recordTimeSpent();
-      window.removeEventListener('beforeunload', recordTimeSpent);
+      clearInterval(timeInterval);
+      trackTimeSpent();
+      window.removeEventListener('beforeunload', trackTimeSpent);
     }
   });
 </script>
